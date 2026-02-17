@@ -24,6 +24,7 @@ type mockStore struct {
 	err  error
 }
 
+func (m *mockStore) Ping(_ context.Context) error { return nil }
 func (m *mockStore) GetAPIKeyByPrefix(_ context.Context, _ string) ([]*models.APIKey, error) {
 	return m.keys, m.err
 }

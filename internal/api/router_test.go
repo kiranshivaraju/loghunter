@@ -22,6 +22,7 @@ import (
 
 type stubStore struct{}
 
+func (s *stubStore) Ping(_ context.Context) error                                { return nil }
 func (s *stubStore) GetDefaultTenant(_ context.Context) (*models.Tenant, error) {
 	return nil, store.ErrNotFound
 }

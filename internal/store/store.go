@@ -14,6 +14,7 @@ var ErrDuplicateKey = errors.New("duplicate key violation")
 
 // Store is the data access interface. All database operations go through here.
 type Store interface {
+	Ping(ctx context.Context) error
 	GetDefaultTenant(ctx context.Context) (*models.Tenant, error)
 
 	GetAPIKeyByPrefix(ctx context.Context, prefix string) ([]*models.APIKey, error)

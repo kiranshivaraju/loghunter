@@ -81,3 +81,8 @@ func (c *RedisCache) IncrWithExpiry(ctx context.Context, key string, expiry time
 	}
 	return incr.Val(), nil
 }
+
+// Close closes the underlying Redis client connection.
+func (c *RedisCache) Close() error {
+	return c.client.Close()
+}
