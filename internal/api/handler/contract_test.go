@@ -73,6 +73,8 @@ func newMockStore() *mockStore {
 	}
 }
 
+func (s *mockStore) Ping(_ context.Context) error { return nil }
+
 func (s *mockStore) GetDefaultTenant(_ context.Context) (*models.Tenant, error) {
 	return &models.Tenant{ID: testTenantID, Name: "test-tenant"}, nil
 }
