@@ -1,0 +1,1 @@
+../../.speckit/commands/speckit.tasks.md

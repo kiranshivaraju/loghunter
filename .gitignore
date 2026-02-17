@@ -1,0 +1,46 @@
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+loghunter
+loghunter-server
+loghunter-cli
+
+# Go test output
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go build cache
+/tmp/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Grafana plugin build output
+grafana-plugin/dist/
+grafana-plugin/node_modules/
+grafana-plugin/coverage/
+
+# ProdKit sensitive files — NEVER commit these
+.prodkit/.github-token
+.prodkit/cache/
+.prodkit/.state/
+
+# Test artifacts
+tests/fixtures/generated/

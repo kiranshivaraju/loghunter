@@ -1,0 +1,60 @@
+prodkit:
+  version: "1.0.0"
+
+project:
+  name: "loghunter"
+  type: "go"  # python, node, go, rust, etc.
+  description: "AI-powered log debugging tool for Loki/Grafana — automatically surfaces errors, summarizes logs, and provides root cause analysis"
+
+github:
+  username: "kiranshivaraju"
+  repo: "kiranshivaraju/loghunter"  # format: username/repo-name
+  default_branch: "main"
+  # Token stored securely in .prodkit/.github-token (not in this file)
+
+dependencies:
+  speckit:
+    required: true
+    version: ">=1.0.0"
+
+development:
+  workflow: "speckit"  # Use Speckit for /prodkit.dev
+  auto_push: false     # Manual review before pushing
+
+code_review:
+  enabled: true              # Enable AI code review in /prodkit.dev
+  block_on_security: true    # Block PR creation if security issues found
+  block_on_quality: false    # Quality issues are warnings only
+  auto_fix_simple: false     # Future: auto-fix simple issues (not implemented yet)
+
+testing:
+  framework: "go test"  # pytest, jest, go test, cargo test, etc.
+  min_coverage: 80
+  types:
+    - unit
+    - contract
+    - integration
+
+sprints:
+  current: 1
+  naming_pattern: "v{N}"  # v1, v2, v3, etc.
+
+structure:
+  product_docs: "product/"
+  sprint_docs: "sprints/"
+  source: "src/"
+  tests: "tests/"
+
+labels:
+  priority:
+    - "P0"  # Critical
+    - "P1"  # High
+    - "P2"  # Medium
+  types:
+    - "feature"
+    - "unit-test"
+    - "contract-test"
+    - "integration-test"
+    - "infrastructure"
+    - "refactor"
+    - "documentation"
