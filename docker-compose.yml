@@ -1,0 +1,61 @@
+services:
+  loghunter:
+    build: .
+    ports:
+      - "${LOGHUNTER_PORT:-8080}:8080"
+    environment:
+      LOGHUNTER_PORT: "8080"
+      LOGHUNTER_ENV: "${LOGHUNTER_ENV:-development}"
+      DATABASE_URL: "postgres://loghunter:loghunter@postgres:5432/loghunter?sslmode=disable"
+      REDIS_URL: "redis://redis:6379"
+      LOKI_BASE_URL: "${LOKI_BASE_URL:-http://host.docker.internal:3100}"
+      LOKI_ORG_ID: "${LOKI_ORG_ID:-default}"
+      AI_PROVIDER: "${AI_PROVIDER:-ollama}"
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-llama3}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: loghunter
+      POSTGRES_PASSWORD: loghunter
+      POSTGRES_DB: loghunter
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loghunter"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+volumes:
+  pgdata:
+  redisdata:
+  ollama_models:
