@@ -13,7 +13,7 @@ import (
 )
 
 // ErrNoLogsFound is returned when no logs match the query parameters.
-var ErrNoLogsFound = errors.New("no logs found for the given parameters")
+var ErrNoLogsFound = ai.ErrNoLogsFound
 
 // SummarizeParams holds validated parameters for a summarization request.
 type SummarizeParams struct {
