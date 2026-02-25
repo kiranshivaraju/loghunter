@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
@@ -111,20 +110,8 @@ func NewSummarizeHandler(svc Summarizer) http.HandlerFunc {
 			MaxLines:  maxLines,
 		})
 		if err != nil {
-			switch {
-			case errors.Is(err, ErrNoLogsFound):
-				response.Error(w, http.StatusNotFound, "NO_LOGS_FOUND",
-					"No logs found for the given parameters", nil)
-			case errors.Is(err, ai.ErrProviderUnavailable):
-				response.Error(w, http.StatusBadGateway, "AI_PROVIDER_UNAVAILABLE",
-					"The AI provider is not available", nil)
-			case errors.Is(err, ai.ErrInferenceTimeout):
-				response.Error(w, http.StatusGatewayTimeout, "AI_INFERENCE_TIMEOUT",
-					"AI summarization took too long and was cancelled", nil)
-			default:
-				response.Error(w, http.StatusInternalServerError, "INTERNAL_ERROR",
-					"An unexpected error occurred", nil)
-			}
+			status, code, msg := mapError(err)
+			response.Error(w, status, code, msg, nil)
 			return
 		}
 
