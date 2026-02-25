@@ -16,10 +16,17 @@ FROM alpine:3.19
 
 RUN apk add --no-cache ca-certificates tzdata
 
+RUN adduser -D -u 1000 loghunter
+
 COPY --from=builder /bin/loghunter-server /usr/local/bin/loghunter-server
 COPY --from=builder /bin/loghunter /usr/local/bin/loghunter
 COPY migrations /migrations
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost:8080/api/v1/health || exit 1
+
+USER loghunter
 
 ENTRYPOINT ["loghunter-server"]
