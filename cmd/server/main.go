@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"github.com/kiranshivaraju/loghunter/internal/ai"
+	"github.com/kiranshivaraju/loghunter/internal/analysis"
 	"github.com/kiranshivaraju/loghunter/internal/api"
+	"github.com/kiranshivaraju/loghunter/internal/api/handler"
 	mw "github.com/kiranshivaraju/loghunter/internal/api/middleware"
-	"github.com/kiranshivaraju/loghunter/internal/api/response"
-	"github.com/kiranshivaraju/loghunter/internal/cache"
+"github.com/kiranshivaraju/loghunter/internal/cache"
 	"github.com/kiranshivaraju/loghunter/internal/config"
+	"github.com/kiranshivaraju/loghunter/internal/loki"
 	"github.com/kiranshivaraju/loghunter/internal/store"
 )
 
@@ -79,10 +81,25 @@ func run() error {
 	}
 	slog.Info("AI provider initialized", "provider", aiProvider.Name())
 
-	// 6. Create store
+	// 6. Create Loki client
+	lokiClient := loki.NewHTTPClient(
+		cfg.Loki.BaseURL,
+		cfg.Loki.Username,
+		cfg.Loki.Password,
+		cfg.Loki.OrgID,
+		cfg.Loki.Timeout,
+	)
+	slog.Info("loki client initialized", "url", cfg.Loki.BaseURL)
+
+	// 7. Create store
 	pgStore := store.NewPostgresStore(pool)
 
-	// 7. Build router with dependencies
+	// 8. Create services
+	analysisSvc := ai.NewAnalysisService(aiProvider, lokiClient, pgStore, redisCache, cfg.AI.InferenceTimeout)
+	searchSvc := analysis.NewSearchService(lokiClient, pgStore, redisCache)
+	summarizeAdapter := &summarizeAdapterSvc{svc: analysisSvc}
+
+	// 9. Build router with dependencies
 	auth := mw.NewAuth(pgStore)
 	rateLimit := mw.NewRateLimit(redisCache, 60)
 
@@ -90,13 +107,21 @@ func run() error {
 		Auth:      auth,
 		RateLimit: rateLimit,
 
-		HealthHandler: healthHandler(pgStore, redisCache),
-		// Remaining handlers will be wired as they are implemented
+		HealthHandler:    handler.NewHealthHandler(pgStore, redisCache, lokiClient, aiProvider),
+		AnalyzeHandler:   handler.NewAnalyzeHandler(pgStore, analysisSvc),
+		PollJobHandler:   handler.NewPollJobHandler(pgStore, redisCache),
+		ListClusters:     handler.NewListClustersHandler(pgStore),
+		GetCluster:       handler.NewGetClusterHandler(pgStore),
+		SummarizeHandler: handler.NewSummarizeHandler(summarizeAdapter),
+		SearchHandler:    handler.NewSearchHandler(searchSvc),
+		CreateKeyHandler: handler.NewCreateKeyHandler(pgStore),
+		ListKeysHandler:  handler.NewListKeysHandler(pgStore),
+		RevokeKeyHandler: handler.NewRevokeKeyHandler(pgStore),
 	}
 
 	router := api.NewRouter(deps)
 
-	// 8. Start HTTP server
+	// 10. Start HTTP server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	srv := &http.Server{
 		Addr:         addr,
@@ -136,31 +161,30 @@ func run() error {
 	return nil
 }
 
-// healthHandler checks database and cache connectivity.
-func healthHandler(s store.Store, c cache.Cache) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		checks := map[string]string{
-			"database": "ok",
-			"cache":    "ok",
-		}
+// summarizeAdapterSvc adapts ai.AnalysisService to the handler.Summarizer interface.
+// The handler interface doesn't pass context, so the adapter uses context.Background().
+type summarizeAdapterSvc struct {
+	svc *ai.AnalysisService
+}
 
-		if err := s.Ping(r.Context()); err != nil {
-			checks["database"] = "degraded"
-		}
-		if err := c.Ping(r.Context()); err != nil {
-			checks["cache"] = "degraded"
-		}
-
-		degraded := checks["database"] != "ok" || checks["cache"] != "ok"
-		if degraded {
-			response.Error(w, http.StatusServiceUnavailable, "DEGRADED",
-				"One or more services degraded", checks)
-			return
-		}
-
-		response.JSON(w, map[string]any{
-			"status":   "ok",
-			"services": checks,
-		})
+func (a *summarizeAdapterSvc) Summarize(params handler.SummarizeParams) (*handler.SummarizeResult, error) {
+	result, err := a.svc.Summarize(context.Background(), ai.SummarizeParams{
+		TenantID:  params.TenantID,
+		Service:   params.Service,
+		Namespace: params.Namespace,
+		Start:     params.Start,
+		End:       params.End,
+		MaxLines:  params.MaxLines,
+	})
+	if err != nil {
+		return nil, err
 	}
+	return &handler.SummarizeResult{
+		Summary:       result.Summary,
+		LinesAnalyzed: result.LinesAnalyzed,
+		From:          result.From,
+		To:            result.To,
+		Provider:      result.Provider,
+		Model:         result.Model,
+	}, nil
 }
