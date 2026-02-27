@@ -1,10 +1,11 @@
 package ai
 
-import "errors"
+import "github.com/kiranshivaraju/loghunter/internal/ai/shared"
 
+// Re-export error sentinels from shared package for backwards compatibility.
 var (
-	ErrProviderUnavailable = errors.New("ai provider unavailable")
-	ErrInferenceTimeout    = errors.New("ai inference timeout")
-	ErrInvalidResponse     = errors.New("ai provider returned invalid response")
-	ErrNoLogsFound         = errors.New("no logs found for the given parameters")
+	ErrProviderUnavailable = shared.ErrProviderUnavailable
+	ErrInferenceTimeout    = shared.ErrInferenceTimeout
+	ErrInvalidResponse     = shared.ErrInvalidResponse
+	ErrNoLogsFound         = shared.ErrNoLogsFound
 )
