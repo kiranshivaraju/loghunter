@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kiranshivaraju/loghunter/internal/api/handler"
 	"github.com/kiranshivaraju/loghunter/internal/cache"
 	"github.com/kiranshivaraju/loghunter/internal/store"
 	"github.com/kiranshivaraju/loghunter/pkg/models"
@@ -88,10 +89,24 @@ func (c *testCache) IncrWithExpiry(_ context.Context, _ string, _ time.Duration)
 
 var _ cache.Cache = (*testCache)(nil)
 
+// ─── mock loki & AI for health handler ──────────────────────────────────────
+
+type testLoki struct {
+	readyErr error
+}
+
+func (l *testLoki) Ready(_ context.Context) error { return l.readyErr }
+
+type testAI struct {
+	name string
+}
+
+func (a *testAI) Name() string { return a.name }
+
 // ─── health handler tests ───────────────────────────────────────────────────
 
 func TestHealthHandler_AllOK(t *testing.T) {
-	h := healthHandler(&testStore{}, &testCache{})
+	h := handler.NewHealthHandler(&testStore{}, &testCache{}, &testLoki{}, &testAI{name: "ollama"})
 
 	req := httptest.NewRequest("GET", "/api/v1/health", nil)
 	w := httptest.NewRecorder()
@@ -103,13 +118,18 @@ func TestHealthHandler_AllOK(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	data := body["data"].(map[string]any)
 	assert.Equal(t, "ok", data["status"])
-	services := data["services"].(map[string]any)
-	assert.Equal(t, "ok", services["database"])
-	assert.Equal(t, "ok", services["cache"])
+	checks := data["checks"].(map[string]any)
+	assert.Equal(t, "ok", checks["database"])
+	assert.Equal(t, "ok", checks["redis"])
 }
 
 func TestHealthHandler_DatabaseDegraded(t *testing.T) {
-	h := healthHandler(&testStore{pingErr: errors.New("connection refused")}, &testCache{})
+	h := handler.NewHealthHandler(
+		&testStore{pingErr: errors.New("connection refused")},
+		&testCache{},
+		&testLoki{},
+		&testAI{name: "ollama"},
+	)
 
 	req := httptest.NewRequest("GET", "/api/v1/health", nil)
 	w := httptest.NewRecorder()
@@ -119,12 +139,17 @@ func TestHealthHandler_DatabaseDegraded(t *testing.T) {
 
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	errObj := body["error"].(map[string]any)
-	assert.Equal(t, "DEGRADED", errObj["code"])
+	data := body["data"].(map[string]any)
+	assert.Equal(t, "degraded", data["status"])
 }
 
 func TestHealthHandler_CacheDegraded(t *testing.T) {
-	h := healthHandler(&testStore{}, &testCache{pingErr: errors.New("redis down")})
+	h := handler.NewHealthHandler(
+		&testStore{},
+		&testCache{pingErr: errors.New("redis down")},
+		&testLoki{},
+		&testAI{name: "ollama"},
+	)
 
 	req := httptest.NewRequest("GET", "/api/v1/health", nil)
 	w := httptest.NewRecorder()
@@ -134,9 +159,11 @@ func TestHealthHandler_CacheDegraded(t *testing.T) {
 }
 
 func TestHealthHandler_BothDegraded(t *testing.T) {
-	h := healthHandler(
+	h := handler.NewHealthHandler(
 		&testStore{pingErr: errors.New("db down")},
 		&testCache{pingErr: errors.New("redis down")},
+		&testLoki{},
+		&testAI{name: "ollama"},
 	)
 
 	req := httptest.NewRequest("GET", "/api/v1/health", nil)
