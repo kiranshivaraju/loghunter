@@ -91,6 +91,58 @@ AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+## Watcher — Proactive Log Monitoring
+
+The Watcher is a background loop that continuously monitors your services for errors — so you don't have to go hunting for them manually.
+
+**How it works:**
+
+1. Every 60 seconds, the Watcher queries Loki for recent error/warn logs across your services
+2. Groups identical errors into clusters using fingerprinting (normalizes timestamps, UUIDs, hex addresses, then hashes)
+3. Detects **new** error clusters (never seen before) and **spikes** (error count jumped 3x+)
+4. Automatically triggers AI root cause analysis on new/spiking clusters
+5. Results are available via `GET /api/v1/watcher/status` — by the time you check, the answer is already there
+
+**Enable it:**
+
+```bash
+WATCHER_ENABLED=true
+WATCHER_INTERVAL_SECS=30              # poll every 30s (default: 60)
+WATCHER_SERVICES=payment-service,auth-service  # or omit to auto-discover from Loki
+WATCHER_AUTO_ANALYZE=true             # auto-trigger AI analysis (default: true)
+WATCHER_SPIKE_THRESHOLD=3.0           # 3x count increase = spike (default: 3.0)
+```
+
+**All Watcher config:**
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `WATCHER_ENABLED` | `false` | Enable the background watcher |
+| `WATCHER_INTERVAL_SECS` | `60` | Seconds between poll cycles |
+| `WATCHER_LOOKBACK_SECS` | `120` | How far back each poll looks |
+| `WATCHER_SERVICES` | *(empty)* | Comma-separated service list, or empty for auto-discovery |
+| `WATCHER_NAMESPACE` | `default` | Namespace filter for Loki queries |
+| `WATCHER_AUTO_ANALYZE` | `true` | Auto-trigger AI analysis on findings |
+| `WATCHER_SPIKE_THRESHOLD` | `3.0` | Count ratio that constitutes a spike |
+| `WATCHER_MAX_SERVICES` | `50` | Cap on auto-discovered services |
+| `WATCHER_LOGS_LIMIT` | `2000` | Max log lines per service per poll |
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/health` | Health check (public) |
+| `GET` | `/api/v1/watcher/status` | Watcher status and recent findings |
+| `POST` | `/api/v1/search` | Search logs by keyword, service, time range |
+| `GET` | `/api/v1/clusters` | List error clusters |
+| `GET` | `/api/v1/clusters/{id}` | Get cluster details |
+| `POST` | `/api/v1/analyze` | Trigger AI analysis on a cluster |
+| `GET` | `/api/v1/analyze/{jobID}` | Poll analysis job status |
+| `POST` | `/api/v1/summarize` | AI-powered log summary |
+| `POST` | `/api/v1/admin/keys` | Create API key (admin) |
+| `GET` | `/api/v1/admin/keys` | List API keys (admin) |
+| `DELETE` | `/api/v1/admin/keys/{id}` | Revoke API key (admin) |
+
 ## Project Structure
 
 ```
@@ -108,22 +160,14 @@ ANTHROPIC_API_KEY=sk-ant-...
 │   │   ├── anthropic/
 │   │   └── mock/       # Test mock provider
 │   ├── analysis/       # Error clustering and detection
-│   ├── anomaly/        # Anomaly detection and baselines
+│   ├── watcher/        # Proactive log monitoring background loop
 │   ├── store/          # PostgreSQL data access layer
 │   ├── cache/          # Redis cache layer
 │   └── config/         # Configuration loading
 ├── pkg/
 │   ├── models/         # Shared data models (AIProvider interface, etc.)
-│   ├── logql/          # Shared LogQL utilities
-│   └── notify/         # Notification senders
-├── alloy/              # Grafana Alloy extension component
+│   └── logql/          # Shared LogQL utilities
 ├── migrations/         # SQL migration files
-├── grafana-plugin/     # Grafana plugin (TypeScript/React)
-├── tests/
-│   ├── unit/           # Unit tests
-│   ├── contract/       # API contract tests
-│   ├── integration/    # Integration tests
-│   └── fixtures/       # Test data fixtures
 ├── product/            # Product documentation (PRD, tech docs)
 ├── sprints/            # Sprint documentation
 └── .prodkit/           # ProdKit framework config

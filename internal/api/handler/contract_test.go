@@ -194,6 +194,15 @@ func (s *mockStore) UpdateJobStatus(_ context.Context, id uuid.UUID, status stri
 	}
 	return store.ErrNotFound
 }
+func (s *mockStore) UpsertErrorClusterFull(_ context.Context, _ *models.ErrorCluster) (store.UpsertResult, error) {
+	return store.UpsertResult{}, nil
+}
+func (s *mockStore) CreateWatcherFinding(_ context.Context, _ *models.WatcherFinding) error {
+	return nil
+}
+func (s *mockStore) ListWatcherFindings(_ context.Context, _ uuid.UUID, _ int) ([]*models.WatcherFinding, error) {
+	return nil, nil
+}
 
 var _ store.Store = (*mockStore)(nil)
 

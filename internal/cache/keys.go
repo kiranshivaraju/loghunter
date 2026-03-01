@@ -21,3 +21,7 @@ func RateLimitKey(keyPrefix string) string {
 func SearchResultKey(tenantID uuid.UUID, filterHash string) string {
 	return fmt.Sprintf("loki:search:%s:%s", tenantID, filterHash)
 }
+
+func WatcherAnalysisGuardKey(tenantID uuid.UUID, clusterID uuid.UUID) string {
+	return fmt.Sprintf("watcher:analyzed:%s:%s", tenantID, clusterID)
+}

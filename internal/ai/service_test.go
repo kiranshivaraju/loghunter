@@ -49,6 +49,13 @@ func (s *mockStore) GetClustersByFingerprints(_ context.Context, _ uuid.UUID, _ 
 func (s *mockStore) GetAnalysisResultByJobID(_ context.Context, _ uuid.UUID) (*models.AnalysisResult, error) { return nil, nil }
 func (s *mockStore) GetAnalysisResultByClusterID(_ context.Context, _ uuid.UUID) (*models.AnalysisResult, error) { return nil, nil }
 func (s *mockStore) GetJob(_ context.Context, _ uuid.UUID, _ uuid.UUID) (*models.Job, error) { return nil, nil }
+func (s *mockStore) UpsertErrorClusterFull(_ context.Context, _ *models.ErrorCluster) (store.UpsertResult, error) {
+	return store.UpsertResult{}, nil
+}
+func (s *mockStore) CreateWatcherFinding(_ context.Context, _ *models.WatcherFinding) error { return nil }
+func (s *mockStore) ListWatcherFindings(_ context.Context, _ uuid.UUID, _ int) ([]*models.WatcherFinding, error) {
+	return nil, nil
+}
 
 func (s *mockStore) CreateJob(_ context.Context, job *models.Job) error {
 	if s.createJobErr != nil {

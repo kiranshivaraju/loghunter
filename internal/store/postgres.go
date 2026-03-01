@@ -128,7 +128,17 @@ func (s *PostgresStore) RevokeAPIKey(ctx context.Context, id uuid.UUID, tenantID
 // --- Error Clusters ---
 
 func (s *PostgresStore) UpsertErrorCluster(ctx context.Context, cluster *models.ErrorCluster) (*models.ErrorCluster, error) {
+	r, err := s.UpsertErrorClusterFull(ctx, cluster)
+	if err != nil {
+		return nil, err
+	}
+	return r.Cluster, nil
+}
+
+func (s *PostgresStore) UpsertErrorClusterFull(ctx context.Context, cluster *models.ErrorCluster) (UpsertResult, error) {
 	var result models.ErrorCluster
+	var isNew bool
+	var prevCount int
 	err := s.pool.QueryRow(ctx,
 		`INSERT INTO error_clusters (id, tenant_id, service, namespace, fingerprint, level, first_seen_at, last_seen_at, count, sample_message, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -136,17 +146,19 @@ func (s *PostgresStore) UpsertErrorCluster(ctx context.Context, cluster *models.
 		   count = error_clusters.count + EXCLUDED.count,
 		   last_seen_at = GREATEST(error_clusters.last_seen_at, EXCLUDED.last_seen_at),
 		   updated_at = NOW()
-		 RETURNING id, tenant_id, service, namespace, fingerprint, level, first_seen_at, last_seen_at, count, sample_message, created_at, updated_at`,
+		 RETURNING id, tenant_id, service, namespace, fingerprint, level, first_seen_at, last_seen_at, count, sample_message, created_at, updated_at,
+		   (xmax = 0)::boolean,
+		   CASE WHEN (xmax = 0) THEN 0 ELSE count - EXCLUDED.count END`,
 		cluster.ID, cluster.TenantID, cluster.Service, cluster.Namespace, cluster.Fingerprint,
 		cluster.Level, cluster.FirstSeenAt, cluster.LastSeenAt, cluster.Count, cluster.SampleMessage,
 		cluster.CreatedAt, cluster.UpdatedAt,
 	).Scan(&result.ID, &result.TenantID, &result.Service, &result.Namespace, &result.Fingerprint,
 		&result.Level, &result.FirstSeenAt, &result.LastSeenAt, &result.Count, &result.SampleMessage,
-		&result.CreatedAt, &result.UpdatedAt)
+		&result.CreatedAt, &result.UpdatedAt, &isNew, &prevCount)
 	if err != nil {
-		return nil, fmt.Errorf("upsert error cluster: %w", err)
+		return UpsertResult{}, fmt.Errorf("upsert error cluster: %w", err)
 	}
-	return &result, nil
+	return UpsertResult{Cluster: &result, IsNew: isNew, PrevCount: prevCount}, nil
 }
 
 func (s *PostgresStore) ListErrorClusters(ctx context.Context, filter ClusterFilter) ([]*models.ErrorCluster, int, error) {
@@ -411,6 +423,46 @@ func (s *PostgresStore) UpdateJobStatus(ctx context.Context, id uuid.UUID, statu
 		return fmt.Errorf("update job status: %w", err)
 	}
 	return nil
+}
+
+// --- Watcher Findings ---
+
+func (s *PostgresStore) CreateWatcherFinding(ctx context.Context, finding *models.WatcherFinding) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO watcher_findings (id, tenant_id, cluster_id, service, namespace, kind, current_count, prev_count, analysis_triggered, job_id, detected_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		finding.ID, finding.TenantID, finding.ClusterID, finding.Service, finding.Namespace,
+		finding.Kind, finding.CurrentCount, finding.PrevCount, finding.AnalysisTriggered,
+		finding.JobID, finding.DetectedAt)
+	if err != nil {
+		return fmt.Errorf("create watcher finding: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) ListWatcherFindings(ctx context.Context, tenantID uuid.UUID, limit int) ([]*models.WatcherFinding, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, tenant_id, cluster_id, service, namespace, kind, current_count, prev_count, analysis_triggered, job_id, detected_at
+		 FROM watcher_findings WHERE tenant_id = $1 ORDER BY detected_at DESC LIMIT $2`, tenantID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list watcher findings: %w", err)
+	}
+	defer rows.Close()
+
+	var findings []*models.WatcherFinding
+	for rows.Next() {
+		var f models.WatcherFinding
+		if err := rows.Scan(&f.ID, &f.TenantID, &f.ClusterID, &f.Service, &f.Namespace,
+			&f.Kind, &f.CurrentCount, &f.PrevCount, &f.AnalysisTriggered,
+			&f.JobID, &f.DetectedAt); err != nil {
+			return nil, fmt.Errorf("scan watcher finding: %w", err)
+		}
+		findings = append(findings, &f)
+	}
+	return findings, rows.Err()
 }
 
 // isDuplicateKeyError checks if a pgx error is a unique constraint violation.

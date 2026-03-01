@@ -13,8 +13,9 @@ type Dependencies struct {
 	Auth      *mw.Auth
 	RateLimit *mw.RateLimit
 
-	HealthHandler   http.HandlerFunc
-	AnalyzeHandler  http.HandlerFunc
+	HealthHandler        http.HandlerFunc
+	WatcherStatusHandler http.HandlerFunc
+	AnalyzeHandler       http.HandlerFunc
 	PollJobHandler  http.HandlerFunc
 	ListClusters    http.HandlerFunc
 	GetCluster      http.HandlerFunc
@@ -40,6 +41,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Group(func(r chi.Router) {
 		r.Use(deps.Auth.Authenticate)
 		r.Use(deps.RateLimit.Limit)
+
+		r.Get("/api/v1/watcher/status", orNotImplemented(deps.WatcherStatusHandler))
 
 		r.Post("/api/v1/analyze", orNotImplemented(deps.AnalyzeHandler))
 		r.Get("/api/v1/analyze/{jobID}", orNotImplemented(deps.PollJobHandler))
