@@ -76,6 +76,15 @@ func (m *mockSearchStore) ListAPIKeys(_ context.Context, _ uuid.UUID) ([]*models
 func (m *mockSearchStore) RevokeAPIKey(_ context.Context, _ uuid.UUID, _ uuid.UUID) error {
 	return nil
 }
+func (m *mockSearchStore) UpsertErrorClusterFull(_ context.Context, _ *models.ErrorCluster) (store.UpsertResult, error) {
+	return store.UpsertResult{}, nil
+}
+func (m *mockSearchStore) CreateWatcherFinding(_ context.Context, _ *models.WatcherFinding) error {
+	return nil
+}
+func (m *mockSearchStore) ListWatcherFindings(_ context.Context, _ uuid.UUID, _ int) ([]*models.WatcherFinding, error) {
+	return nil, nil
+}
 
 // --- mock cache ---
 

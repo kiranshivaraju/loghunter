@@ -65,6 +65,15 @@ func (m *mockStore) GetJob(_ context.Context, _ uuid.UUID, _ uuid.UUID) (*models
 func (m *mockStore) UpdateJobStatus(_ context.Context, _ uuid.UUID, _ string, _ ...store.JobUpdateOption) error {
 	return nil
 }
+func (m *mockStore) UpsertErrorClusterFull(_ context.Context, _ *models.ErrorCluster) (store.UpsertResult, error) {
+	return store.UpsertResult{}, nil
+}
+func (m *mockStore) CreateWatcherFinding(_ context.Context, _ *models.WatcherFinding) error {
+	return nil
+}
+func (m *mockStore) ListWatcherFindings(_ context.Context, _ uuid.UUID, _ int) ([]*models.WatcherFinding, error) {
+	return nil, nil
+}
 
 // --- Mock Cache ---
 

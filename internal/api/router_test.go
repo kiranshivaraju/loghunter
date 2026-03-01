@@ -63,6 +63,15 @@ func (s *stubStore) GetJob(_ context.Context, _ uuid.UUID, _ uuid.UUID) (*models
 func (s *stubStore) UpdateJobStatus(_ context.Context, _ uuid.UUID, _ string, _ ...store.JobUpdateOption) error {
 	return nil
 }
+func (s *stubStore) UpsertErrorClusterFull(_ context.Context, _ *models.ErrorCluster) (store.UpsertResult, error) {
+	return store.UpsertResult{}, nil
+}
+func (s *stubStore) CreateWatcherFinding(_ context.Context, _ *models.WatcherFinding) error {
+	return nil
+}
+func (s *stubStore) ListWatcherFindings(_ context.Context, _ uuid.UUID, _ int) ([]*models.WatcherFinding, error) {
+	return nil, nil
+}
 
 // --- stub cache ---
 

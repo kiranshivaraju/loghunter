@@ -15,6 +15,19 @@ type Config struct {
 	Redis    RedisConfig
 	Loki     LokiConfig
 	AI       AIConfig
+	Watcher  WatcherConfig
+}
+
+type WatcherConfig struct {
+	Enabled        bool
+	Interval       time.Duration
+	LookbackWindow time.Duration
+	Services       []string
+	Namespace      string
+	AutoAnalyze    bool
+	SpikeThreshold float64
+	MaxServices    int
+	LogsLimit      int
 }
 
 type ServerConfig struct {
@@ -121,6 +134,17 @@ func Load() (*Config, error) {
 				Model:  envString("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929"),
 			},
 		},
+		Watcher: WatcherConfig{
+			Enabled:        envBool("WATCHER_ENABLED", false),
+			Interval:       envDurationSecs("WATCHER_INTERVAL_SECS", 60*time.Second),
+			LookbackWindow: envDurationSecs("WATCHER_LOOKBACK_SECS", 120*time.Second),
+			Services:       envStringSlice("WATCHER_SERVICES"),
+			Namespace:      envString("WATCHER_NAMESPACE", "default"),
+			AutoAnalyze:    envBool("WATCHER_AUTO_ANALYZE", true),
+			SpikeThreshold: envFloat("WATCHER_SPIKE_THRESHOLD", 3.0),
+			MaxServices:    envInt("WATCHER_MAX_SERVICES", 50),
+			LogsLimit:      envInt("WATCHER_LOGS_LIMIT", 2000),
+		},
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -204,4 +228,42 @@ func envDurationSecs(key string, defaultVal time.Duration) time.Duration {
 		return defaultVal
 	}
 	return time.Duration(secs) * time.Second
+}
+
+func envBool(key string, defaultVal bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return defaultVal
+	}
+	return b
+}
+
+func envFloat(key string, defaultVal float64) float64 {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return defaultVal
+	}
+	return f
+}
+
+func envStringSlice(key string) []string {
+	v := os.Getenv(key)
+	if v == "" {
+		return nil
+	}
+	var result []string
+	for _, s := range strings.Split(v, ",") {
+		if t := strings.TrimSpace(s); t != "" {
+			result = append(result, t)
+		}
+	}
+	return result
 }

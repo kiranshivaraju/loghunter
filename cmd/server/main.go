@@ -17,10 +17,11 @@ import (
 	"github.com/kiranshivaraju/loghunter/internal/api"
 	"github.com/kiranshivaraju/loghunter/internal/api/handler"
 	mw "github.com/kiranshivaraju/loghunter/internal/api/middleware"
-"github.com/kiranshivaraju/loghunter/internal/cache"
+	"github.com/kiranshivaraju/loghunter/internal/cache"
 	"github.com/kiranshivaraju/loghunter/internal/config"
 	"github.com/kiranshivaraju/loghunter/internal/loki"
 	"github.com/kiranshivaraju/loghunter/internal/store"
+	"github.com/kiranshivaraju/loghunter/internal/watcher"
 )
 
 const shutdownTimeout = 30 * time.Second
@@ -99,7 +100,17 @@ func run() error {
 	searchSvc := analysis.NewSearchService(lokiClient, pgStore, redisCache)
 	summarizeAdapter := &summarizeAdapterSvc{svc: analysisSvc}
 
-	// 9. Build router with dependencies
+	// 9. Create watcher
+	defaultTenant, err := pgStore.GetDefaultTenant(ctx)
+	if err != nil {
+		return fmt.Errorf("get default tenant: %w", err)
+	}
+
+	w := watcher.New(cfg.Watcher, lokiClient, pgStore, analysisSvc, redisCache, defaultTenant)
+	go w.Run(ctx)
+	watcherStatusAdapter := &watcherStatusAdapterSvc{w: w}
+
+	// 10. Build router with dependencies
 	auth := mw.NewAuth(pgStore)
 	rateLimit := mw.NewRateLimit(redisCache, 60)
 
@@ -107,8 +118,9 @@ func run() error {
 		Auth:      auth,
 		RateLimit: rateLimit,
 
-		HealthHandler:    handler.NewHealthHandler(pgStore, redisCache, lokiClient, aiProvider),
-		AnalyzeHandler:   handler.NewAnalyzeHandler(pgStore, analysisSvc),
+		HealthHandler:        handler.NewHealthHandler(pgStore, redisCache, lokiClient, aiProvider),
+		WatcherStatusHandler: handler.NewWatcherStatusHandler(watcherStatusAdapter),
+		AnalyzeHandler:       handler.NewAnalyzeHandler(pgStore, analysisSvc),
 		PollJobHandler:   handler.NewPollJobHandler(pgStore, redisCache),
 		ListClusters:     handler.NewListClustersHandler(pgStore),
 		GetCluster:       handler.NewGetClusterHandler(pgStore),
@@ -121,7 +133,7 @@ func run() error {
 
 	router := api.NewRouter(deps)
 
-	// 10. Start HTTP server
+	// 11. Start HTTP server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	srv := &http.Server{
 		Addr:         addr,
@@ -186,5 +198,25 @@ func (a *summarizeAdapterSvc) Summarize(params handler.SummarizeParams) (*handle
 		To:            result.To,
 		Provider:      result.Provider,
 		Model:         result.Model,
+	}, nil
+}
+
+// watcherStatusAdapterSvc adapts watcher.Watcher to the handler.WatcherStatusProvider interface.
+type watcherStatusAdapterSvc struct {
+	w *watcher.Watcher
+}
+
+func (a *watcherStatusAdapterSvc) WatcherStatus(ctx context.Context) (handler.WatcherStatus, error) {
+	s, err := a.w.Status(ctx)
+	if err != nil {
+		return handler.WatcherStatus{}, err
+	}
+	return handler.WatcherStatus{
+		Enabled:         s.Enabled,
+		Running:         s.Running,
+		LastPollAt:      s.LastPollAt,
+		NextPollAt:      s.NextPollAt,
+		ServicesWatched: s.ServicesWatched,
+		RecentFindings:  s.RecentFindings,
 	}, nil
 }

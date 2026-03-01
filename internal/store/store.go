@@ -24,6 +24,7 @@ type Store interface {
 	RevokeAPIKey(ctx context.Context, id uuid.UUID, tenantID uuid.UUID) error
 
 	UpsertErrorCluster(ctx context.Context, cluster *models.ErrorCluster) (*models.ErrorCluster, error)
+	UpsertErrorClusterFull(ctx context.Context, cluster *models.ErrorCluster) (UpsertResult, error)
 	ListErrorClusters(ctx context.Context, filter ClusterFilter) ([]*models.ErrorCluster, int, error)
 	GetErrorCluster(ctx context.Context, id uuid.UUID, tenantID uuid.UUID) (*models.ErrorCluster, error)
 	GetClustersByFingerprints(ctx context.Context, tenantID uuid.UUID, fingerprints []string) ([]*models.ErrorCluster, error)
@@ -35,6 +36,16 @@ type Store interface {
 	CreateJob(ctx context.Context, job *models.Job) error
 	GetJob(ctx context.Context, id uuid.UUID, tenantID uuid.UUID) (*models.Job, error)
 	UpdateJobStatus(ctx context.Context, id uuid.UUID, status string, opts ...JobUpdateOption) error
+
+	CreateWatcherFinding(ctx context.Context, finding *models.WatcherFinding) error
+	ListWatcherFindings(ctx context.Context, tenantID uuid.UUID, limit int) ([]*models.WatcherFinding, error)
+}
+
+// UpsertResult is returned by UpsertErrorClusterFull with metadata about the upsert operation.
+type UpsertResult struct {
+	Cluster   *models.ErrorCluster
+	IsNew     bool // true when the row was INSERTed (not updated)
+	PrevCount int  // count before this upsert (0 when IsNew)
 }
 
 type ClusterFilter struct {

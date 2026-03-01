@@ -64,6 +64,15 @@ func (s *testStore) GetJob(_ context.Context, _ uuid.UUID, _ uuid.UUID) (*models
 func (s *testStore) UpdateJobStatus(_ context.Context, _ uuid.UUID, _ string, _ ...store.JobUpdateOption) error {
 	return nil
 }
+func (s *testStore) UpsertErrorClusterFull(_ context.Context, _ *models.ErrorCluster) (store.UpsertResult, error) {
+	return store.UpsertResult{}, nil
+}
+func (s *testStore) CreateWatcherFinding(_ context.Context, _ *models.WatcherFinding) error {
+	return nil
+}
+func (s *testStore) ListWatcherFindings(_ context.Context, _ uuid.UUID, _ int) ([]*models.WatcherFinding, error) {
+	return nil, nil
+}
 
 var _ store.Store = (*testStore)(nil)
 
